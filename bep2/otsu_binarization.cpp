@@ -18,51 +18,72 @@ int main(void)
 	int height = img_gray.rows;
 	int N = height * width;
 
+	int pdf_start = 0, pdf_end = 0;
 	int threshold = 0;
 
 	// dynamic binarization; Otsu binarization
 	Mat img_otsu(height, width, CV_8UC1);
 
+	float pdf_before[255] = { 0, };
 	float arr_pdf[255] = { 0, };
 	for (int j = 0; j < height; j++) {	// pdf
 		for (int i = 0; i < width; i++) {
-			arr_pdf[img_gray.at<uchar>(j, i)]++;
+			pdf_before[img_gray.at<uchar>(j, i)]++;
+		}
+	}
+	for (int i = 0; i < 256; i++) {
+		if (pdf_before[0] != 0) break;
+		if (pdf_before[i] == 0) {
+			pdf_start = i + 1;
+			break;
+		}
+	}
+	for (int i = pdf_start; i < 256; i++) {
+		if (pdf_before[i] == 0) {
+			pdf_end = i;
+			break;
+		}
+	}
+	for (int i = pdf_start; i < pdf_end; i++) {
+		arr_pdf[i] = pdf_before[i] / N;
+	}
+
+	double w = 0, w0 = 0, w1 = 0;
+	double u = 0, u0 = 0, u1 = 0, uT = 0;
+	double s0 = 0, s1 = 0, s_W = 0;
+	double sigma_w_sqrt = 0, sigma_b_sqrt = 0, sigma_total = 0;
+	double v_max = -10000;
+
+	for (int tmp_thres = pdf_start; tmp_thres < pdf_end; tmp_thres++) {
+		for (int k = pdf_start; k <= tmp_thres; k++) {
+			if (pdf_end - pdf_start != 0) w0 += arr_pdf[k] / (pdf_end - pdf_start);
+			if (tmp_thres - pdf_start != 0) u0 += k * arr_pdf[k] / (tmp_thres - pdf_start);
+		}
+		for (int k = pdf_start; k <= tmp_thres; k++) {
+			if (tmp_thres - pdf_start != 0) s0 += powf(k - u0, 2) * arr_pdf[k] / (tmp_thres - pdf_start);
+		}
+
+		for (int k = tmp_thres + 1; k < pdf_end; k++) {
+			if (pdf_end - pdf_start != 0) w1 += arr_pdf[k] / (pdf_end - pdf_start);
+			if (pdf_end - tmp_thres != 0) u1 += k * arr_pdf[k] / (pdf_end - tmp_thres);
+		}
+		for (int k = tmp_thres + 1; k < pdf_end; k++) {
+			if (pdf_end - tmp_thres != 0) s1 += powf(k - u1, 2) * arr_pdf[k] / (pdf_end - tmp_thres);
+		}
+
+		sigma_w_sqrt = w0 * s0 + w1 * s1;
+		sigma_b_sqrt = w0 * w1 * powf(u1 - u0, 2);
+		sigma_total = sigma_w_sqrt - sigma_b_sqrt;
+		if (v_max < sigma_b_sqrt) {
+			if ((tmp_thres - pdf_start) != 0) v_min = sigma_b_sqrt;
+			threshold = tmp_thres;
 		}
 	}
 
-	float w0 = 0; float w1 = 0;
-	float u0 = 0; float u1 = 0; float uT = 0;
-	float sigma_b_sqrt = 0; float sigma_T_sqrt = 0;
-	float eta = 0; float v_max = -1;
-	for (int pix = 0; pix < 256; pix++) {
-		for (int i = 0; i < pix; i++) {
-			w0 += (arr_pdf[i] / N);
-			u0 += i * (arr_pdf[i] / N);
-		}
-		w1 = 1 - w0;
-
-		float temp = u0;
-		if (w0 != 0) u0 = temp / w0;
-		else u0 = 0;
-		for (int i = 0; i < 256; i++)
-			uT += i * (arr_pdf[i] / N);
-		u1 = (uT - temp) / w1;
-
-		sigma_b_sqrt = w0 * w1 * powf(u0 - u1, 2);
-		for (int i = 0; i < 256; i++)
-			sigma_T_sqrt += powf(i - uT, 2) * (arr_pdf[i] / N);
-
-		eta = sigma_b_sqrt / sigma_T_sqrt;
-		if (v_max < eta) {
-			v_max = eta;
-			threshold = pix;
-		}
-	}
-
-	for (int j = 0; j < height; j++) {
-		for (int i = 0; i < width; i++) {
-			if (img_gray.at<uchar>(j, i) > threshold) img_otsu.at<uchar>(j, i) = 255;
-			else img_otsu.at<uchar>(j, i) = 0;
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			if (img_gray.at<uchar>(y, x) > threshold) img_otsu.at<uchar>(y, x) = 255;
+			else img_otsu.at<uchar>(y, x) = 0;
 		}
 	}
 
@@ -70,12 +91,12 @@ int main(void)
 	Mat img_histo(200, 256, CV_8UC1, Scalar(0));
 
 	int max = -1;
-	for (int i = 0; i < 256; i++)
-		if (max < arr_pdf[i]) max = arr_pdf[i];
+	for (int i = pdf_start; i < 256; i++)
+		if (max < pdf_before[i]) max = pdf_before[i];
 
 	for (int i = 0; i < 256; i++)
 	{
-		int histo = 200 * arr_pdf[i] / (float)max;
+		int histo = 200 * pdf_before[i] / (float)max;
 
 		line(img_histo, Point(i, 200), Point(i, 200 - histo), Scalar(255, 255, 255));
 		line(img_histo, Point(threshold, 0), Point(threshold, 255), Scalar(200, 200, 200));

@@ -47,22 +47,48 @@ void dilation(Mat img_in, Mat& img_out, Mat mask) {
 	}
 }
 
+void graydilation(Mat img_in, Mat& img_out, Mat mask) {
+	Mat img_padding;
+	zeroPad(img_in, img_padding, mask.rows);
+
+	img_out = Mat(img_in.rows, img_in.cols, CV_8U);
+	int center_mask = mask.rows / 2;
+
+	for (int j = center_mask; j < img_padding.rows - center_mask; j++) {
+		for (int i = center_mask; i < img_padding.cols - center_mask; i++) {
+			int max = 0;
+			for (int v = 0; v < mask.rows; v++) {
+				for (int u = 0; u < mask.rows; u++) {
+					if (img_padding.at<uchar>(j + v - mask.rows / 2, i + u - mask.rows / 2) > max) {
+						max = img_padding.at<uchar>(j + v - mask.rows / 2, i + u - mask.rows / 2);
+					}
+				}
+			}
+			img_out.at<uchar>(j - center_mask, i - center_mask) = max;
+		}
+	}
+}
+
 int main(void)
 {
-	Mat img_gray = imread("img2.bmp", 0);
+	Mat img_gray = imread("LENA256.jpg", 0);
 	if (img_gray.empty()) {
 		cout << "image load failed!" << endl;
 		return -1;
 	}
 	Mat img_dilation(img_gray.size(), CV_8U);
+	Mat img_graydilation(img_gray.size(), CV_8U);
 	int data_mask[9] = { 0, };
 	Mat mask(3, 3, CV_8U, data_mask);
 
 	dilation(img_gray, img_dilation, mask);
+	graydilation(img_gray, img_graydilation, mask);
 
 	imshow("original", img_gray);
-	imshow("dilation", img_dilation);
+	//imshow("dilation", img_dilation);
 	//imwrite("dilation_5.jpg", img_dilation);
+	imshow("grayscale dilation", img_graydilation);
+	imwrite("graydilation.jpg", img_graydilation);
 
 	waitKey(0);
 	return 0;

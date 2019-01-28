@@ -30,16 +30,21 @@ void erosion(Mat img_in, Mat& img_out, Mat mask) {
 	for (int j = center_mask; j < img_padding.rows - center_mask; j++) {
 		for (int i = center_mask; i < img_padding.cols - center_mask; i++) {
 			int binary = 255;
-			int flag = 0;
+			int flag1 = 0, flag2 = 0;
 			for (int v = 0; v < mask.rows; v++) {
 				for (int u = 0; u < mask.rows; u++) {
+					if (mask.at<float>(v, u) == 0) {
+						flag1 = 1;
+						continue;
+					}
 					if (img_padding.at<float>(j + v - center_mask, i + u - center_mask) != mask.at<float>(v, u)) {
 						binary = 0;
-						flag = 1;
+						flag2 = 1;
 						break;
 					}
 				}
-				if (flag == 1) break;
+				if (flag1 == 1) continue;
+				if (flag2 == 1) break;
 			}
 			img_out.at<float>(j - center_mask, i - center_mask) = binary;
 		}
@@ -57,12 +62,12 @@ void hitOrMiss(Mat img_in, Mat& img_out) {
 
 	float c[] = {
 		255, 255, 255,
-		0, 255, 0,
+		0, 0, 0,
 		0, 0, 0
 	};
 	float d[] = {
 		0, 0, 0,
-		0, 0, 0,
+		255, 0, 255,
 		255, 255, 255
 	};
 	Mat C(3, 3, CV_32F, c);
@@ -88,7 +93,7 @@ void hitOrMiss(Mat img_in, Mat& img_out) {
 
 int main(void)
 {
-	Mat img_gray = imread("img3.bmp", 0);
+	Mat img_gray = imread("img1.bmp", 0);
 	if (img_gray.empty()) {
 		cout << "image load failed!" << endl;
 		return -1;
